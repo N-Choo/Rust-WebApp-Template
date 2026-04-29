@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "server_a4"
 version = "0.1.0"
 edition = "2024"
 
@@ -15,4 +15,13 @@ env_logger = "0.11.8"
 log = "0.4.28"
 awc = "3.8.1"
 serde_json = "1.0.145"
+oauth2 = "5.0.0"
+anyhow = "1.0.102"
+dotenvy = "0.15.7"
+serde = { version = "1.0.228", features = ["derive"] }
+moka = { version = "0.12.15", features = ["sync"] }
+uuid = { version = "1.23.1", features = ["v4"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+json = { version = "0.12.4", default-features = false }
+urlencoding = "2.1.3"
 

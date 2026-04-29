@@ -3,27 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rust WebApp Template</title>
-    <link rel="stylesheet" href="/style.css" />
+    <title>Organization Portal</title>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>Welcome to Your Rust WebApp</h1>
-        <p class="subtitle">Powered by Actix-Web</p>
-      </header>
+    <nav class="top-nav">
+      <div class="nav-brand" data-nav="/">🏢 OrgPortal</div>
 
-      <main>
-        <section class="card">
-          <h2>Authentication</h2>
-          <p>Please log in to access the dashboard and secure features.</p>
-          <a href="/login" class="btn btn-primary">Log in</a>
-        </section>
-      </main>
+      <div class="nav-controls">
+        <span class="greeting"
+          >Hello, <span id="userDisplayName">Guest</span></span
+        >
 
-      <footer>
-        <p>Ready to build something amazing. 🦀</p>
-      </footer>
-    </div>
+        <div id="navActions" style="display: none">
+          <button class="nav-btn" data-nav="/users">Directory</button>
+          <button class="nav-btn" data-nav="/update">Profile</button>
+        </div>
+
+        <button id="loginBtn" class="auth-btn" data-action="login">
+          Login
+        </button>
+      </div>
+    </nav>
+
+    <main id="app"></main>
+
+    <script type="module" src="main.js"></script>
   </body>
 </html>

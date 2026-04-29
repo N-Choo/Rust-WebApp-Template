@@ -1,53 +1,100 @@
-# Rust WebApp Template 🦀
+# Rust Webapp Template with Entra ID OAuth2
 
-A lightweight, modern web application template built with Rust and **Actix-Web**. It includes a static frontend, a configured Actix server, and custom logging.
+This is a full-stack web application template featuring a high-performance **Rust (Actix-Web)** backend and a modular, lightweight **Vanilla JavaScript** frontend.
+It includes a fully functional **OAuth 2.0 Authorization Code Flow** implementation, pre-configured to authenticate users via **Microsoft Entra ID (Azure AD)**. The backend securely handles token exchange and session management, keeping the frontend stateless and fast.
 
-## What is Included?
+---
 
-The repository is structured into two main parts: the `client` (Frontend) and the `server` (Backend).
+## Features
 
-- **`client/`**: Contains the frontend static files.
-  - `index.html`: A clean, modern landing page template.
-  - `style.css`: A responsive, dark/light mode friendly CSS stylesheet.
-- **`server/`**: The Rust Actix-Web backend.
-  - **Static File Serving**: Pre-configured to serve the `client/` folder automatically.
-  - **Custom Configuration**: Centralized environment variable loading and network setup (`config.rs`).
-  - **Custom Logger**: Configured `env_logger` for clean, readable terminal output.
+- **Backend:** Rust, Actix-Web, `oauth2` crate for authentication, `moka` for fast in-memory session caching.
+- **Frontend:** Modular Vanilla ES6 JavaScript, pure CSS, no heavy frameworks.
+- **Auth:** Secure, HTTP-only cookie-based sessions protecting Microsoft Graph API calls.
+- **Routing:** Client-side hash routing (`/#/users`, `/#/update`) with an App Shell architecture.
 
-## How to Run
+---
 
-### Prerequisites
+## Configuration Setup
 
-Make sure you have [Rust and Cargo](https://rustup.rs/) installed on your machine.
+Before running the application, you must configure your Microsoft Entra ID credentials. Create an `.env` file at the root of the `server/` directory (or wherever your binary runs) with the following variables:
 
-### 1. Start the Server (Development)
+```env
+# Entra ID App Credentials
+CLIENT_ID=your-client-id
+CLIENT_SECRET=your-client-secret
+TENANT_ID=your-tenant-id
 
-To run the server locally, navigate to the `server` directory and run it via Cargo:
+# Microsoft OAuth Endpoints
+AUTH_URL=[https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize](https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/authorize)
+TOKEN_URL=[https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token](https://login.microsoftonline.com/your-tenant-id/oauth2/v2.0/token)
+
+# Permissions requested during login
+OAUTH_SCOPE=User.ReadWrite
+
+# Local Development URL
+HOST=http://localhost:3000
+```
+
+> **Important:** Ensure your Microsoft Entra ID App Registration has the **Redirect URI** set to `http://localhost:3000/api/auth/callback` for local development.
+
+---
+
+## Project Structure
+
+```text
+├── client/                 # Frontend assets (Static HTML/JS/CSS)
+│   ├── index.html          # Main App Shell & Navigation
+│   ├── style.css           # Global styles and layout
+│   ├── main.js             # Entry point & Client-side router
+│   ├── api.js              # Centralized API and Session Error handling
+│   └── pages/              # Individual HTML views (welcome, directory, profile)
+│
+├── server/                 # Rust Actix-Web Backend
+│   ├── Cargo.toml          # Rust dependencies
+│   ├── src/
+│   │   ├── main.rs         # Server initialization
+│   │   ├── config.rs       # OAuth client & Moka Cache setup
+│   │   ├── routes.rs       # API route definitions
+│   │   ├── handler/        # Request handlers (auth.rs, graph.rs)
+│   │   ├── services/       # External API logic (Microsoft Graph calls)
+│   │   └── models/         # Serde structs for data serialization
+│   └── .env                # (Create this file based on the section above)
+```
+
+---
+
+## Getting Started
+
+### 1. Prerequisites
+
+- Install [Rust & Cargo](https://rustup.rs/)
+- A registered App in Microsoft Entra ID (Azure AD) to get your `CLIENT_ID` and `CLIENT_SECRET`.
+
+### 2. Run the Application
+
+Navigate to the server directory and start the application:
 
 ```bash
 cd server
 cargo run
 ```
 
-By default, the server will start listening on `http://127.0.0.1:3000`.
+The server will start (defaulting to `http://localhost:3000`). The backend is configured to statically serve the files from the `client/` folder.
 
-### 2. Environment Variables
+### 3. Usage
 
-You can customize the server's behavior by passing environment variables:
+1. Open your browser and go to `http://localhost:3000`.
+2. Click **Login** to be redirected to Microsoft Entra ID.
+3. Upon successful login, you will be redirected back to the app with a secure session cookie.
+4. You can now view the **Organization Directory** or update your **Profile**, which communicates securely with the Microsoft Graph API.
 
-- `TS_PORT`: The port the server listens on (Default is `3000`).
+---
 
-Example of running with custom variables:
+## How the Authentication Works
 
-```bash
-TS_PORT=8080 cargo run
-```
+1. **Login:** Hitting `/api/auth/login` generates a CSRF `state`, caches it, and redirects to Microsoft.
+2. **Callback:** Microsoft redirects to `/api/auth/callback` with a `code`. The server validates the CSRF state and exchanges the code for a Microsoft Access Token.
+3. **Session:** The server generates a random UUID (`session_id`), maps it to the Access Token in a `moka` memory cache, and sets an `HttpOnly` cookie in the user's browser.
+4. **API Calls:** When the frontend requests `/api/graph/users`, the backend reads the cookie, fetches the Entra token from the cache, makes the Graph API request, and returns the JSON to the frontend.
 
-## 🛠 How to Continue (Development)
-
-This template is designed to be a starting point. Here is how to expand it:
-
-1. **Add API Routes:** Open `server/src/routes.rs`. You can uncomment and expand the `api_routes` function to start building your JSON API endpoints under the `/api/` scope.
-2. **Add New Handlers:** Create new files in `server/src/handler/` (like `auth.rs` or `users.rs`), add them to `handler/mod.rs`, and bind them to your routes.
-3. **Expand the Frontend:**
-   Add more HTML, JS, or images to the `client/` folder. The Actix `fs::Files` service will automatically serve anything you place in there.
+_(Note: Because sessions are currently stored in memory via the `moka` crate, restarting the Rust server will clear all active sessions and log users out. For production, consider swapping the memory cache with a Redis store)._
