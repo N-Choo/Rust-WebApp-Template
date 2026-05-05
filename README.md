@@ -42,23 +42,34 @@ HOST=http://localhost:3000
 ## Project Structure
 
 ```text
-├── client/                 # Frontend assets (Static HTML/JS/CSS)
-│   ├── index.html          # Main App Shell & Navigation
-│   ├── style.css           # Global styles and layout
-│   ├── main.js             # Entry point & Client-side router
-│   ├── api.js              # Centralized API and Session Error handling
-│   └── pages/              # Individual HTML views (welcome, directory, profile)
+├── client/                      # Vanilla JS Frontend
+│   ├── index.html               # App Shell & Navigation
+│   ├── main.js                 # Client-side router & App initialization
+│   ├── api.js                 # Centralized API client
+│   ├── auth.js                # Authentication helpers
+│   ├── users.js               # Users page logic
+│   ├── profile.js            # Profile page logic
+│   ├── style.css             # Global styles
+│   └── pages/                # Page templates
+│       ├── welcome.html
+│       ├── users.html
+│       ├── profile.html
+│       └── unauthorized.html
 │
-├── server/                 # Rust Actix-Web Backend
-│   ├── Cargo.toml          # Rust dependencies
-│   ├── src/
-│   │   ├── main.rs         # Server initialization
-│   │   ├── config.rs       # OAuth client & Moka Cache setup
-│   │   ├── routes.rs       # API route definitions
-│   │   ├── handler/        # Request handlers (auth.rs, graph.rs)
-│   │   ├── services/       # External API logic (Microsoft Graph calls)
-│   │   └── models/         # Serde structs for data serialization
-│   └── .env                # (Create this file based on the section above)
+├── server/                      # Rust Actix-Web Backend
+│   ├── Cargo.toml             # Rust dependencies
+│   ├── .env                  # Environment configuration
+│   └── src/
+│       ├── main.rs           # Server entry point
+│       ├── config.rs         # AppConfig, AppState, OAuth & Moka Cache setup
+│       ├── routes.rs        # API route definitions
+│       ├── handler/         # Request handlers
+│       │   ├── auth.rs     # Login, callback, logout handlers
+│       │   └── graph.rs    # Graph API proxy handlers
+│       ├── services/       # External API clients
+│       │   └── graph.rs    # Microsoft Graph API service
+│       └── models/         # Data models
+│           └── user.rs      # UserProfile, GraphResponse
 ```
 
 ---
@@ -90,11 +101,45 @@ The server will start (defaulting to `http://localhost:3000`). The backend is co
 
 ---
 
-## How the Authentication Works
+## Architecture
 
-1. **Login:** Hitting `/api/auth/login` generates a CSRF `state`, caches it, and redirects to Microsoft.
-2. **Callback:** Microsoft redirects to `/api/auth/callback` with a `code`. The server validates the CSRF state and exchanges the code for a Microsoft Access Token.
-3. **Session:** The server generates a random UUID (`session_id`), maps it to the Access Token in a `moka` memory cache, and sets an `HttpOnly` cookie in the user's browser.
-4. **API Calls:** When the frontend requests `/api/graph/users`, the backend reads the cookie, fetches the Entra token from the cache, makes the Graph API request, and returns the JSON to the frontend.
+### Backend (Rust + Actix-Web)
 
-_(Note: Because sessions are currently stored in memory via the `moka` crate, restarting the Rust server will clear all active sessions and log users out. For production, consider swapping the memory cache with a Redis store)._
+The backend follows a layered architecture:
+
+```
+┌─────────────────────────────────────────────────┐
+│                   routes.rs                     │  Route definitions
+├─────────────────────────────────────────────────┤
+│           handler/auth.rs  │  handler/graph.rs  │  Request handlers
+├─────────────────────────────────────────────────┤
+│           services/graph.rs                     │  External API client
+├─────────────────────────────────────────────────┤
+│              config.rs (AppState)               │  OAuth client + Moka cache
+└─────────────────────────────────────────────────┘
+```
+
+- **config.rs**: `AppConfig` loads environment, initializes OAuth client, and creates the shared `AppState` with a `moka` cache for session storage.
+- **routes.rs**: Defines `/api/auth/*` and `/api/graph/*` routes, plus static file serving.
+- **handler/**: Contains request handlers. `auth.rs` handles OAuth flow, `graph.rs` proxies Microsoft Graph API calls.
+- **services/graph.rs**: Pure client for Microsoft's Graph API.
+- **models/**: Serde-serializable structs (`UserProfile`, `GraphResponse`).
+
+### Frontend (Vanilla JS)
+
+SPA with client-side hash routing (`/#/users`, `/#/profile`):
+
+- **main.js**: App shell, router, and page lazy-loading
+- **api.js**: Centralized fetch wrapper with session error handling
+- **auth.js**: Auth state management
+- **users.js** / **profile.js**: Page-specific logic
+- **pages/**: HTML templates
+
+### Authentication Flow
+
+1. **Login**: GET `/api/auth/login` generates a CSRF state, caches it, redirects to Microsoft.
+2. **Callback**: Microsoft redirects to `/api/auth/callback` with a code. Server validates CSRF, exchanges code for access token.
+3. **Session**: Server creates a UUID `session_id`, maps it to the access token in the Moka cache, sets an `HttpOnly` cookie.
+4. **API Requests**: Frontend calls `/api/graph/*`. Backend reads the cookie, retrieves the token from cache, calls Microsoft Graph, returns JSON.
+
+> **Note**: Sessions are stored in-memory via Moka. Restarting the server clears all sessions. For production, replace with Redis.
